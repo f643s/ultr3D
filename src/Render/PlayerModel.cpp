@@ -28,7 +28,7 @@ constexpr float PI = 3.14159265358979f;
 constexpr int MAX_JOINTS = 128;
 
 constexpr const char* PLAYER_VERTEX = R"GLSL(
-#version 320 es
+#version 300 es
 layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec3 aNrm;
 layout(location = 2) in vec2 aUv;
@@ -77,8 +77,8 @@ void main() {
 // Headlight half-lambert: a character needs SOME shading to read in 3D,
 // but baked/flat lighting keeps the look predictable.
 constexpr const char* PLAYER_FRAGMENT = R"GLSL(
-#version 320 es
-precision mediump float;
+#version 300 es
+precision highp float;
 
 in vec3 vNrm;
 in vec2 vUv;
@@ -92,13 +92,28 @@ uniform vec3 uCamPos;
 
 out vec4 fragColor;
 
+// Same colour convention as the map shader: material factors arrive linear,
+// textures are sRGB, and the RGBA8 target wants sRGB on the way out.
+vec3 srgbToLinear(vec3 c) {
+    c = clamp(c, 0.0, 1.0);
+    return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)),
+               step(vec3(0.04045), c));
+}
+
+vec3 linearToSrgb(vec3 c) {
+    c = max(c, vec3(0.0));
+    return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055,
+               step(vec3(0.0031308), c));
+}
+
 void main() {
     vec3 N = normalize(vNrm);
     vec3 L = normalize(uCamPos - vWorld);
     // flat: the texture carries all lighting (baked/toon characters)
     float diff = uFlat ? 1.0 : dot(N, L) * 0.5 + 0.5; // half-lambert
     vec4 base = uHasTex ? texture(uTex, vUv) : vec4(1.0);
-    fragColor = vec4(base.rgb * uColor.rgb * diff, base.a * uColor.a);
+    vec3 albedo = uColor.rgb * srgbToLinear(base.rgb);
+    fragColor = vec4(linearToSrgb(albedo * diff), base.a * uColor.a);
 }
 )GLSL";
 

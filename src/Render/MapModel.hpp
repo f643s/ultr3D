@@ -198,6 +198,7 @@ class CMapModel {
     int                     m_uModel = -1;
     int                     m_uColor = -1;
     int                     m_uTex = -1;
+    int                     m_uHasTex = -1;
     int                     m_uEmissive = -1;
     int                     m_uHasEmissive = -1;
     int                     m_uEmissiveFactor = -1;

@@ -4529,7 +4529,7 @@ class CHypr3DPassElement final : public IPassElement {
     }
 
     const char* passName() override {
-        return "Hypr3D";
+        return "ultr3d";
     }
 
     ePassElementType type() override {
@@ -7078,9 +7078,9 @@ APICALL EXPORT PLUGIN_DESCRIPTION_INFO PLUGIN_INIT(HANDLE handle) {
     }
 
     return {
-        "hypr3d",
+        "ultr3d",
         "A new perspective on window management",
-        "Samine825",
+        "f643s",
         "0.5.0"
     };
 }
@@ -7093,7 +7093,7 @@ APICALL EXPORT void PLUGIN_EXIT() {
     // IHyprRenderer::beginRender, measured on 0.56.2). `hyprctl plugin unload`
     // calls this from the event loop, between frames, so the element is done.
     if (g_pHyprRenderer)
-        g_pHyprRenderer->m_renderPass.removeAllOfType("Hypr3D");
+        g_pHyprRenderer->m_renderPass.removeAllOfType("ultr3d");
 
     if (g_deactivateLater && g_pEventLoopManager)
         g_pEventLoopManager->removeDoLater(g_deactivateLater);

@@ -25,7 +25,7 @@
   });
 in
   hyprlandFixed.stdenv.mkDerivation {
-    pname = "hypr3d";
+    pname = "ultr3d";
     inherit version;
 
     src = ../.;
@@ -48,7 +48,7 @@ in
     # The CMake project produces the plugin .so but has no install rules:
     # pick the single shared object out of the build tree and give it a
     # stable name so users can write
-    #   plugin = ${pkgs.hypr3d}/lib/hypr3d.so
+    #   plugin = ${pkgs.ultr3d}/lib/ultr3d.so
     installPhase = ''
       runHook preInstall
 
@@ -59,13 +59,13 @@ in
         exit 1
       }
       mkdir -p "$out/lib"
-      install -Dm755 "$SO" "$out/lib/hypr3d.so"
+      install -Dm755 "$SO" "$out/lib/ultr3d.so"
 
       runHook postInstall
     '';
 
     meta = with lib; {
-      homepage = "https://github.com/samine825/Hypr3D";
+      homepage = "https://github.com/f643s/ultr3D";
       description = "A walkable 3D room workspace plugin for Hyprland";
       license = licenses.mit;
       platforms = platforms.linux;

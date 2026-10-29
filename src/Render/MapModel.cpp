@@ -38,8 +38,9 @@ out vec2 vUV;
 
 void main() {
     gl_Position = uMVP * vec4(aPosition, 1.0);
-    // Uniform scale only, so the rotated basis is a valid normal basis.
-    vNormal = mat3(uModel) * aNormal;
+    // Inverse transpose: non-uniform config scale otherwise shears the
+    // normals and lights the surface with the wrong direction.
+    vNormal = transpose(inverse(mat3(uModel))) * aNormal;
     vUV = aUV;
 }
 )GLSL";
@@ -71,12 +72,13 @@ void main() {
 constexpr const char* MAP_FRAGMENT = R"GLSL(
 #version 300 es
 
-precision mediump float;
+precision highp float;
 
 in vec3 vNormal;
 in vec2 vUV;
 
 uniform sampler2D uTex;
+uniform int uHasTex;   // 0 = no baseColorTexture: white fallback
 uniform vec4 uColor;
 uniform sampler2D uEmissive;
 uniform int uHasEmissive;
@@ -88,13 +90,33 @@ uniform float uAlphaCutoff;  // mask cutoff
 
 out vec4 fragColor;
 
+// glTF factors are linear, baseColor/emissive textures are sRGB. The frame
+// buffer is plain RGBA8, so the shader decodes, lights in linear space and
+// encodes on the way out. Without the decode an untextured graphite factor
+// of 0.06 was written straight to an sRGB display and read as ~0.02.
+vec3 srgbToLinear(vec3 c) {
+    c = clamp(c, 0.0, 1.0);
+    return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)),
+               step(vec3(0.04045), c));
+}
+
+vec3 linearToSrgb(vec3 c) {
+    c = max(c, vec3(0.0));
+    return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055,
+               step(vec3(0.0031308), c));
+}
+
 void main() {
-    vec3 base = uColor.rgb * texture(uTex, vUV).rgb;
+    // Sampling an unbound texture (id 0) returns (0,0,0,1), which turned
+    // every untextured glTF material black while its alpha stayed correct.
+    // The glTF default for a missing baseColorTexture is white.
+    vec4 texel = uHasTex != 0 ? texture(uTex, vUV) : vec4(1.0);
+    vec3 base = uColor.rgb * srgbToLinear(texel.rgb);
 
     // glTF alpha: baseColor alpha = factor.a * texture.a. Opaque forces 1;
     // mask discards below the cutoff; blend passes it through (the draw
     // call enables blending only for the blend pass).
-    float alpha = uColor.a * texture(uTex, vUV).a;
+    float alpha = uColor.a * texel.a;
     if (uAlphaMode == 0)
         alpha = 1.0;
 
@@ -106,16 +128,17 @@ void main() {
     // Blender's view of a baked map.
     if (uFlat != 0) {
         if (uHasEmissive != 0) {
-            vec3 e = texture(uEmissive, vUV).rgb * uEmissiveFactor *
+            vec4 ETEX = texture(uEmissive, vUV);
+            vec3 e = srgbToLinear(ETEX.rgb) * uEmissiveFactor *
                 uEmissiveStrength;
-            float ea = uColor.a * texture(uEmissive, vUV).a;
+            float ea = uColor.a * ETEX.a;
             if (uAlphaMode == 1 && ea < uAlphaCutoff)
                 discard;
-            fragColor = vec4(e, uAlphaMode == 0 ? 1.0 : ea);
+            fragColor = vec4(linearToSrgb(e), uAlphaMode == 0 ? 1.0 : ea);
         } else {
             if (uAlphaMode == 1 && alpha < uAlphaCutoff)
                 discard;
-            fragColor = vec4(base, alpha);
+            fragColor = vec4(linearToSrgb(base), alpha);
         }
         return;
     }
@@ -126,19 +149,23 @@ void main() {
     float wrap = clamp(dot(N, normalize(vec3(0.4, 0.8, 0.45))) * 0.5 + 0.5,
                        0.0, 1.0);
 
-    // Emissive replaces the lambert for baked lights: the bake already
-    // contains the lighting, adding both pushed rooms 1.6-2x over albedo.
+    vec3 lit = base * mix(vec3(0.6), vec3(1.0), wrap);
+
+    // glTF adds emission to the lit base colour. Flat/baked maps keep the
+    // emissive-only path above because their bake already holds the light.
     if (uHasEmissive != 0) {
-        vec3 emissive = texture(uEmissive, vUV).rgb * uEmissiveFactor *
+        vec4 ETEX = texture(uEmissive, vUV);
+        vec3 emissive = srgbToLinear(ETEX.rgb) * uEmissiveFactor *
             uEmissiveStrength;
-        float ea = uColor.a;
+        float ea = uColor.a * ETEX.a;
         if (uAlphaMode == 1 && ea < uAlphaCutoff)
             discard;
-        fragColor = vec4(emissive, uAlphaMode == 0 ? 1.0 : ea);
+        fragColor = vec4(linearToSrgb(lit + emissive),
+                         uAlphaMode == 0 ? 1.0 : ea);
     } else {
         if (uAlphaMode == 1 && alpha < uAlphaCutoff)
             discard;
-        fragColor = vec4(base * mix(vec3(0.6), vec3(1.0), wrap), alpha);
+        fragColor = vec4(linearToSrgb(lit), alpha);
     }
 }
 )GLSL";
@@ -648,6 +675,7 @@ void CMapModel::finishUpload() {
                 m_uModel  = glGetUniformLocation(P, "uModel");
                 m_uColor  = glGetUniformLocation(P, "uColor");
                 m_uTex    = glGetUniformLocation(P, "uTex");
+                m_uHasTex = glGetUniformLocation(P, "uHasTex");
                 m_uEmissive         = glGetUniformLocation(P, "uEmissive");
                 m_uHasEmissive      = glGetUniformLocation(P, "uHasEmissive");
                 m_uEmissiveFactor   = glGetUniformLocation(P, "uEmissiveFactor");
@@ -982,6 +1010,7 @@ void CMapModel::draw(const Mat4& vp, const Vec3& cameraPos) const {
 
     const auto DRAW_PRIM = [&](const SPrimitive& P) {
         glUniform4f(m_uColor, P.color[0], P.color[1], P.color[2], P.color[3]);
+        glUniform1i(m_uHasTex, P.texture != 0 ? 1 : 0);
         glUniform1i(m_uAlphaMode, P.alphaMode);
         glUniform1f(m_uAlphaCutoff, P.alphaCutoff);
 

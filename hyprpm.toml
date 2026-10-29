@@ -1,10 +1,9 @@
 [repository]
-name = "Hypr3D"
-authors = ["Samine825"]
+name = "ultr3d"
+authors = ["f643s", "Samine825"]
 
-[hypr3d]
+[ultr3d]
 description = "A new perspective on window management for Hyprland"
-authors = ["Samine825"]
-output = "build/hypr3d.so"
+authors = ["f643s", "Samine825"]
+output = "build/ultr3d.so"
 build = ["cmake -S . -B build -DHYPRLAND_HEADERS=/var/cache/hyprpm/\"$USER\"/headersRoot", "cmake --build build -j$(nproc)"]
-

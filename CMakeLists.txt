@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.27)
 
-project(hypr3d LANGUAGES CXX)
+project(ultr3d LANGUAGES CXX)
 
 # hyprpm and the README run cmake without a build type, which compiled the
 # plugin's own code unoptimised (-O0, only Jolt had -O2); the official
@@ -103,7 +103,7 @@ pkg_check_modules(LIBDRM REQUIRED IMPORTED_TARGET libdrm)
 pkg_check_modules(XKBCOMMON REQUIRED IMPORTED_TARGET xkbcommon)
 pkg_check_modules(HYPRGRAPHICS REQUIRED IMPORTED_TARGET hyprgraphics)
 
-add_library(hypr3d SHARED
+add_library(ultr3d SHARED
     src/main.cpp
     src/Render/GLScene.cpp
     src/Render/MapModel.cpp
@@ -121,7 +121,7 @@ add_library(hypr3d SHARED
     src/HyprlandCompat/PointerHook.cpp
 )
 
-target_include_directories(hypr3d
+target_include_directories(ultr3d
     BEFORE PRIVATE
         "${HYPRLAND_INCLUDE}"
         "${HYPRLAND_ROOT}"
@@ -130,7 +130,7 @@ target_include_directories(hypr3d
         "${CMAKE_CURRENT_SOURCE_DIR}/src"
 )
 
-target_link_libraries(hypr3d PRIVATE
+target_link_libraries(ultr3d PRIVATE
     PkgConfig::HYPRGRAPHICS
     PkgConfig::PIXMAN
     PkgConfig::LIBDRM
@@ -140,7 +140,7 @@ target_link_libraries(hypr3d PRIVATE
     dl
 )
 
-set_target_properties(hypr3d PROPERTIES
+set_target_properties(ultr3d PROPERTIES
     PREFIX ""
-    OUTPUT_NAME "hypr3d"
+    OUTPUT_NAME "ultr3d"
 )
